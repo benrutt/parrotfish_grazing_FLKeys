@@ -1,0 +1,148 @@
+---
+title: "CAP analysis for parrotfish grazing"
+author: "Benjamin Ruttenberg"
+date: "October 22, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Data processing
+```{r data_processing}
+
+library(plyr)
+library(vegan)
+
+setwd('C:/Users/bruttenb/Google Drive/Project Files/Parrotfish/Analyses/Grazing metrics')
+
+denssize.strat <- read.table('density_size_strat2.csv', header = T, sep = ',')
+
+#reads in species metrics data
+spmetrics <- read.table('grazing_metrics_single_table.csv', header = T, sep = ',')
+#species metrics table assuming all species in the same genera are the same
+#spmetrics <- read.table('grazing_metrics_single_table_by_genera_only.csv', header = T, sep = ',')
+
+#combines species metrics and species by strat data
+grazing <- merge(denssize.strat, spmetrics, by = 'spcode', all.x = T, all.y = F)
+
+cyl <- pi*(7.5^2)
+
+#Calc grazing metrics
+grazing$indiv_w <- with(grazing, lw_a*(len^lw_b)) #units: g/cyl
+grazing$total_w <- with(grazing, indiv_w*num)/cyl #units: g/m2
+grazing$algcons <- with(grazing, (0.0342*(indiv_w^0.816))*num*365)/cyl #units: g/m2; allometric relationship from Bruggeman (note: * 365 converts from day to year)
+grazing$allmacro <- with(grazing, algcons*propmacro) #units: g/m2/yr 
+grazing$brownmacro <- with(grazing, algcons*propbrown) #units: g/m2
+grazing$scarsize <- with(grazing, bitescar_m*(len^2))#units: cm2/bite; cut: *num*720)/cyl #720 min/per 12 hr day per m2
+grazing$biterate <- with(grazing, (biterate_m*len+biterate_b)*num*600) #units: bites/day/line; 600 min/per 10 hr day
+grazing$totalscar <- with(grazing, (biterate*scarsize))/cyl #units: cm2/day/m2
+grazing$scarpercent <- with(grazing, totalscar*365/100) #units: percent of reef grazed per year
+grazing$bioeros <- with(grazing, ((bioeros_v*(len^3))*biterate*1.7*365)/(cyl*1000)) #using 1.7 g/cm3 to convert from volume grazed to g of bioerosion (Mallela, J. & Perry, C.T. Coral Reefs (2007) 26: 129. doi:10.1007/s00338-006-0169-7), converts to kg/yr/m2
+
+grazing1 <- grazing[grazing$spcode %in% unique(spmetrics$spcode) & grazing$len>10,]
+#grazing1$propmacroweight <- grazing1$allmacro/grazing1$algcons
+
+###GRAZING METRICS BY LINE for FL####
+
+#by species sum across strat; for algcons, allmacro, brownmacro, total_w; exclude scar bc of NA values
+byyear.sp1 <- with(grazing1, aggregate(cbind(algcons, allmacro, brownmacro, total_w)~spcode+year+strat, FUN = 'sum', na.rm = T))
+#by species sum across strat; for totalscar only
+byyear.sp2 <- with(grazing1, aggregate(cbind(totalscar, bioeros)~spcode+year+strat, FUN = 'sum', na.rm = T))
+#merge byyear.sp datasets
+byyear.sp3 <- merge(byyear.sp1, byyear.sp2, by = c('spcode', 'year', 'strat'), all.x = T, all.y = F)
+#replaces totalscar with NA values
+byyear.sp3$totalscar <- ifelse(is.na(byyear.sp3$totalscar), 0, byyear.sp3$totalscar)
+byyear.sp3$bioeros <- ifelse(is.na(byyear.sp3$bioeros), 0, byyear.sp3$bioeros)
+
+byyear.sp <- merge(byyear.sp3, spmetrics[c('spcode', 'speciesabbrev')], by = 'spcode', all.x = T, all.y = F)
+
+strata <- as.data.frame(sort(unique(grazing1$strat)))
+names(strata) <- 'strat'
+strata$stratname <- c('Forereef Deep', 'Forereef Mid', 'Forereef Shallow', 'Hi-Rel Reef','Inshore Patch','Mid Patch', 'Offshore Patch')
+strata$plotorder <- c(7,6,5,4,1,2,3)
+strata <- strata[order(strata['plotorder']),]
+
+byyear.sp.barplot <- merge(byyear.sp, strata, by = 'strat', all.x = T, all.y = F)
+
+biomass <- byyear.sp.barplot[byyear.sp.barplot$year > 2002,c('year', 'spcode', 'strat','total_w')]
+biomass$stratyr <- with(biomass, paste(strat, year, sep = ' '))
+
+biomass.wide <- reshape(biomass[,c('spcode', 'stratyr', 'total_w')],timevar = 'spcode', idvar = 'stratyr', direction = 'wide')
+names(biomass.wide) <- gsub('total_w.', '', names(biomass.wide))
+
+
+for(j in 1:nrow(biomass.wide)){
+biomass.wide$strat[j] <- strsplit(biomass.wide$stratyr, ' ')[[j]][1]
+biomass.wide$year[j] <- strsplit(biomass.wide$stratyr, ' ')[[j]][2]
+}
+biomass.wide$stratyr <- NULL
+biomass.wide <- biomass.wide[order(biomass.wide$year, biomass.wide$strat),]
+
+biomass.siteid <- biomass.wide[,c('strat', 'year')]
+biomass.sp <- log(biomass.wide[,1:10]+1)
+
+```
+
+##CAP Analysis
+
+```{r CAP}
+
+cap <-capscale(biomass.sp~strat, biomass.siteid, dist = 'bray')
+#plotting specifications for pch and color
+pchs <- c(21,22,23:25,21,22)
+#capcolors <- 1:7
+capcolors <- rainbow(7)
+
+#creates data frame to plot sites
+cap.sites <- as.data.frame(summary(cap)[5][[1]])
+cap.sites$strat <- row.names(cap.sites)
+cap.sites$strat <- gsub('strat','',cap.sites$strat)
+cap.sites <- merge(cap.sites, strata, by = 'strat', all.x = T, all.y = F)
+cap.sites$pchs <- pchs
+cap.sites$capcolors <- capcolors
+
+#creates data frame to plot arrows
+species.arrows <- as.data.frame(summary(cap)[1][[1]])
+species.arrows$spcode <- rownames(species.arrows)
+species.arrows <- merge(species.arrows, spmetrics[,c('spcode', 'color')], by = 'spcode', all.x = T, all.y = F)
+originpts <- rep(0,nrow(species.arrows))
+#pchs <- as.data.frame(unique(biomass.wide$strat)); names(pchs) <- 'strat'
+#pchs$sym <- 1:7
+summary(cap)
+
+```
+
+##CAP Plots
+
+```{r CAP_plot, fig.width= 7, fig.height=12}
+
+par(mfrow = c(2,1), mar = c(2,2,2,2), oma = c(3,3,1,1))
+
+plot(cap, display = 'sites', type = 'n', xlim = c(-1.25,1.75))
+with(cap.sites, points(CAP1, CAP2, pch = pchs, col = 'black', bg = capcolors, cex = 1.5))
+#points(cap, display = 'cn', pch = pchs, col = 'black', bg = capcolors, cex = 1.5)
+ordiellipse(cap, biomass.siteid$strat, kind = 'se', conf = 0.95, col = capcolors)
+#legend('topleft', legend = levels(as.factor(biomass.siteid$strat)), pch = pchs, col = 'black', pt.bg = capcolors, bty = 'n')
+legend('topleft', legend = as.factor(cap.sites$stratname[order(cap.sites$plotorder)]), pch = cap.sites$pchs[order(cap.sites$plotorder)], col = 'black', pt.bg = cap.sites$capcolors[order(cap.sites$plotorder)], bty = 'n')
+
+plot(cap, display = 'sites', type = 'n', xlim = c(-1.25,1.75))
+arrows(x0 = originpts, x1 = species.arrows$CAP1, y0 = originpts, y1 = species.arrows$CAP2, length = 0.1, lwd = 2, col = as.character(species.arrows$color))
+legend("bottomright",  levels(spmetrics$speciesabbrev), fill = as.character(spmetrics$color), cex = 0.8, bty = 'n')
+#text(cap, display = 'species', cex = 0.7)
+mtext('CAP 1', 1, line = 1, outer = T, cex = 1.25)
+mtext('CAP 2', 2, line = 1, outer = T, cex = 1.25)
+
+
+```
+
+```{r PERMANOVA}
+
+####PerMANOVA test FL RVC#####
+
+adonis(biomass.sp~strat, biomass.siteid, method = 'bray', sqrt.dist = T)
+
+
+```
+

@@ -1,0 +1,11 @@
+speciesname,speciesabbrev,spcode,propmacro,propbrown,bitescar_m,biterate_m,biterate_b,lw_a,lw_b,bioeros_v,color
+Scarus coelestinus,Sc. coelestinus,SCA COEL,0.015600269,0.01293341,0.000579,-0.09078,14.76,0.0201,3.02,1.93E-07,purple
+Scarus coeruleus,Sc. coeruleus,SCA COER,0.003486294,0.002776654,,,,0.0124,3.1109,0,dark red
+Scarus guacamaia,Sc. guacamaia,SCA GUAC,0.013462429,0.009140928,0.000579,-0.09078,14.76,0.0155,3.0626,1.93E-07,red
+Scarus iseri,Sc. iseri,SCA ISER,0.022099695,0.02156969,0.0004013,0,23.89,0.0166,3.02,0.000000193,orange
+Scarus taeniopterus,Sc. taeniopterus,SCA TAEN,0.022099695,0.02156969,0.0004013,0,23.89,0.0177,3,1.93E-07,yellow
+Scarus vetula,Sc. vetula,SCA VETU,0.005515505,0.005515505,0.0004013,0,23.89,0.0186,3.0455,1.93E-07,light green
+Sparisoma aurofrenatum,Sp. aurofrenatum,SPA AURO,0.542763359,0.515693175,,,,0.0047,3.429,0,dark green
+Sparisoma chrysopterum,Sp. chrysopterum,SPA CHRY,0.363066834,0.356810286,,,,0.0099,3.1708,0,light blue
+Sparisoma rubripinne,Sp. rubripinne,SPA RUBR,0.566202999,0.545815707,,,,0.0194,3,0,blue
+Sparisoma viride,Sp. viride,SPA VIRI,0.089813515,0.086558266,0.0005839,-0.14978,11.39,0.025,2.9214,1.30E-06,dark blue
